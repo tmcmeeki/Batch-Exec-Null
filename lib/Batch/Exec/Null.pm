@@ -33,9 +33,29 @@ exists.
 
 =over 4
 
+=item OBJ->arguments
+
+The error message reported when an operator has insufficient arguments.
+
+=item OBJ->blank
+
+Get ot set the REGEXP used to test a blank string.  A default applies.
+
 =item OBJ->error
 
-The error message string reported when method syntax is not complied with.
+The error message reported when method syntax is not complied with.
+
+=item OBJ->novalue
+
+The error message reported when an argument is undefined.
+
+=item OBJ->operator
+
+The error message reported when an invalid operator is specified.
+
+=item OBJ->syntax
+
+The error message reported when any functions are called incorrectly.
 
 =back
 
@@ -71,7 +91,9 @@ my %_attribute = (	# _attributes are restricted; no direct get/set
 	_null_g => \$_s_null,
 	_null_l => S_NULL,
 	arguments => "method %s() operator [%s] requires %s arguments",
+	blank => qr/^\s*$/,
 	error => "method %s() must pass a hash or array reference",
+	novalue => "method %s() argument %s is undefined",
 	operator => "method %s() invalid operator [%s]; must be one of: { %s }",
 	syntax => "SYNTAX: %s(EXPR, [REF])",
 );
@@ -165,11 +187,15 @@ sub Compare {
 
 	$self->log->debug("method [$method] op [$op]");
 
+	# check operator
+
 	my %op = ('eq' => 2, 'like' => 2, 'noop' => 0);
 	my $help = join(', ', sort keys %op);
 	my $msg = sprintf($self->operator, $method, $op, $help);
 
 	$self->log->logconfess($msg) unless exists($op{$op});
+
+	# check arguments
 
 	my $argw = $op{$op};
 	my $args = scalar(@_);
@@ -179,16 +205,27 @@ sub Compare {
 
 	$self->log->logconfess($msg) unless ($args == $argw);
 
-	my $value1 = shift;
-	my $value2 = shift;
+	my @values; for (my $ss = 0; $ss < $args; $ss++) {
+
+		if (defined $_[$ss]) {
+
+			push @values, $_[$ss];
+		} else {
+			$self->log->warn(sprintf $self->novalue, $method, $ss);
+
+			return 0;
+		}
+	}
+
+	# perform the comparison
 
 	if ($op eq 'eq') {
 
-		return 1 if ($value1 eq $value2);
+		return 1 if ($values[0] eq $values[1]);
 
 	} elsif ($op eq 'like') {
 
-		return 1 if ($value1 =~ $value2);
+		return 1 if ($values[0] =~ $values[1]);
 
 	} elsif ($op eq 'noop') {
 
@@ -224,24 +261,26 @@ sub Matches {
 	$self->log->debug("meth [$meth] value [$value] elem [$elem]");
 
 	my $msg = sprintf($self->error, $meth);
-	
+
+	my $op = (ref($value) eq 'Regexp') ? 'like' : 'eq';
+
 	if (defined($ref)) {
 
 		if (ref($ref) eq 'HASH') {
 
 			return 1 if (exists($ref->{$elem}) &&
-				$self->Compare($meth, 'eq', $ref->{$elem}, $value));
+				$self->Compare($meth, $op, $ref->{$elem}, $value));
 
 		} elsif (ref($ref) eq 'ARRAY') {
 
 			return 1 if (exists($ref->[$elem]) &&
-				$self->Compare($meth, 'eq', $ref->[$elem], $value));
+				$self->Compare($meth, $op, $ref->[$elem], $value));
 
 		} else {
 			$self->cough($msg);
 		}
 	}
-	return 1 if ($self->Compare($meth, 'eq', $elem, $value));
+	return 1 if ($self->Compare($meth, $op, $elem, $value));
 
 	return 0;
 }
@@ -272,18 +311,6 @@ sub global {
 	return $self->{'_global'};
 }
 
-=item OBJ->is_notblank(EXPR, [REF])
-
-Check if the string passed in EXPR is a blank or whitespace string.
-
-=cut
-
-sub is_notblank {
-	my $self = shift;
-	my $str = shift;
-	confess "SYNTAX: is_notblank(EXPR, [REF])" unless defined ($str);
-}
-
 =item OBJ->is_blank(EXPR, [REF])
 
 Check if the string passed in EXPR is a blank or whitespace string.
@@ -294,26 +321,22 @@ sub is_blank {
 	my $self = shift;
 	my $elem = shift;
 	my $ref = shift;
-	confess "SYNTAX: is_blank(EXPR, [REF])" unless (
-		defined($elem) && ref($elem) eq '');
 
-	if (defined($ref)) {
-		if (ref($ref) eq 'HASH') {
-		} elsif (ref($ref) eq 'ARRAY') {
-		} else {
-			$self->cough($self->error);
-		}
-	}
+	return $self->Matches("is_blank", $self->blank, $elem, $ref);
+}
 
-	my $str = shift;
-	confess "SYNTAX: is_blank(EXPR, [REF])" unless defined ($str);
+=item OBJ->is_notblank(EXPR, [REF])
 
-#	return -1 unless defined($str);
-#Will return a negative value if EXPR is undefined.
+Check if the string passed in EXPR is a blank or whitespace string.
 
-	return 1 if ($str =~ /^\s*$/);
+=cut
 
-	return 0;
+sub is_notblank {
+	my $self = shift;
+
+	return 0 if ($self->is_blank(@_));
+
+	return 1;
 }
 
 =item OBJ->is_notempty(EXPR, [REF])
@@ -384,9 +407,7 @@ sub is_empty {
 
 =item OBJ->is_null(EXPR, [REF])
 
-The complementary method to B<is_notnull> will report a BOOLEAN denoting if
-the EXPR element of the HASH has a null value (tolerant to a non-existent
-element).
+Will report a BOOLEAN denoting if the EXPR element of the HASH has a null value.
 
 =cut
 
@@ -394,25 +415,22 @@ sub is_null {
 	my $self = shift;
 	my $elem = shift;
 	my $ref = shift;
-	confess "SYNTAX: is_null(EXPR, [REF])" unless defined($elem);
 
-	if (defined($ref)) {
-		if (ref($ref) eq 'HASH') {
+	return $self->Matches("is_null", $self->null, $elem, $ref);
+}
 
-			return 1 if (exists($ref->{$elem})
-				&& $ref->{$elem} eq $self->null);
+=item OBJ->is_notnull(EXPR, [REF])
 
-		} elsif (ref($ref) eq 'ARRAY') {
+The complementary method to B<is_notnull>.
 
-			return 1 if (exists($ref->[$elem])
-				&& $ref->[$elem] eq $self->null);
-		} else {
-			$self->cough($self->error);
-		}
-	}
-	return 1 if ($ref eq $self->null);
+=cut
 
-	return 0;
+sub is_notnull {
+	my $self = shift;
+
+	return 0 if ($self->is_null(@_));
+
+	return 1;
 }
 
 =item OBJ->null([EXPR])
@@ -470,6 +488,8 @@ sub nvl {
 	return $elem;
 }
 
+=back
+
 =head2 ALIASED METHODS
 
 The following method aliases have also been defined:
@@ -477,10 +497,12 @@ The following method aliases have also been defined:
 	alias		base method
 	------------	------------	
 	isnt_blank	is_notblank
+	isnt_null	is_notnull
 
 =cut
 
 *isnt_blank = \&is_notblank;
+*isnt_null = \&is_notnull;
 
 #sub END { }
 
@@ -488,11 +510,10 @@ The following method aliases have also been defined:
 
 __END__
 
-=back
 
 =head1 VERSION
 
-___EUMM_VERSION___
+_IDE_REVISION_
 
 =head1 LICENSE
 

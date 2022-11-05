@@ -1,6 +1,10 @@
 Changes
-Makefile.PL
+IDE_VERSION
+LICENSE
 MANIFEST
+Makefile.PL
 README
-t/Batch-Exec-Null.t
+README.md
 lib/Batch/Exec/Null.pm
+t/00_basic.t
+t/01_primitive.t

@@ -1,0 +1,26 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.1
+date	2022.11.05.21.17.08;	author tomby;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@IDE_PACKAGE: Batch-Exec-Null
+IDE_VERSION: $Revision$
+IDE_DATE: 20221106
+@
