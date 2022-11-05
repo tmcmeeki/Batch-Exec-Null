@@ -1,0 +1,6 @@
+Revision history for Perl extension Batch::Exec::Null.
+
+0.01  Fri Nov  4 05:46:57 2022
+	- original version; created by h2xs 1.23 with options
+		-AX --skip-exporter --use-new-tests -n Batch::Exec::Null -b 5.10.0
+
