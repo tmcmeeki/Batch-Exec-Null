@@ -2,7 +2,7 @@ package Batch::Exec::Null;
 
 =head1 NAME
 
-Batch::Exec::Null: null data element handling for the Batch Executive Framework.
+Batch::Exec::Null - null data element handling for the Batch Executive Framework.
 
 =head1 AUTHOR
 
@@ -21,8 +21,8 @@ Provides also for forcing a consistent and explicit value where ambiguity
 exists.
 
   verbs:
-  - is (non-fatal)
-  - check (fatal)
+  - non-fatal: is, isnt / is_not (which are aliases)
+  - fatal: check
 
   adjectives:
   - blank (whitespace)
@@ -33,9 +33,9 @@ exists.
 
 =over 4
 
-=item OBJ->null
+=item OBJ->error
 
-The string which represents a null (or blank) value.
+The error message string reported when method syntax is not complied with.
 
 =back
 
@@ -70,7 +70,10 @@ my %_attribute = (	# _attributes are restricted; no direct get/set
 	_global => 0,		# boolean: class global null value
 	_null_g => \$_s_null,
 	_null_l => S_NULL,
-	error => "must pass a hash or array",
+	arguments => "method %s() operator [%s] requires %s arguments",
+	error => "method %s() must pass a hash or array reference",
+	operator => "method %s() invalid operator [%s]; must be one of: { %s }",
+	syntax => "SYNTAX: %s(EXPR, [REF])",
 );
 
 #sub INIT { };
@@ -143,6 +146,106 @@ sub new {
 
 =over 4
 
+=item OBJ->Compare(OPERATOR, EXPR, [EXPR])
+
+INTERNAL ROUTINE ONLY.
+Execute the comparison stipulated by OPERATOR (one of: 'eq', 'like'), to
+one or both of the values passed in EXPR (an operator may be unary in nature).
+Returns a boolean, whereby a successful match is TRUE, and FALSE otherwise.
+
+=cut
+
+sub Compare {
+	my $self = shift;
+	my $method = shift;
+	my $op = shift;
+
+	confess "SYNTAX: Compare(OPERATOR, ...)" unless (
+		defined($method) && defined($op));
+
+	$self->log->debug("method [$method] op [$op]");
+
+	my %op = ('eq' => 2, 'like' => 2, 'noop' => 0);
+	my $help = join(', ', sort keys %op);
+	my $msg = sprintf($self->operator, $method, $op, $help);
+
+	$self->log->logconfess($msg) unless exists($op{$op});
+
+	my $argw = $op{$op};
+	my $args = scalar(@_);
+	$self->log->debug(sprintf "argw [$argw] args [$args]");
+
+	$msg = sprintf($self->arguments, $method, $op, $argw);
+
+	$self->log->logconfess($msg) unless ($args == $argw);
+
+	my $value1 = shift;
+	my $value2 = shift;
+
+	if ($op eq 'eq') {
+
+		return 1 if ($value1 eq $value2);
+
+	} elsif ($op eq 'like') {
+
+		return 1 if ($value1 =~ $value2);
+
+	} elsif ($op eq 'noop') {
+
+		return 1;
+	} else {
+		$self->log->logconfess($msg);
+	}
+	return 0;
+}
+
+=item OBJ->Matches(METHOD, VALUE, ELEMENT, [REF])
+
+INTERNAL ROUTINE ONLY.
+Validate that VALUE matches ELEMENT (or indeed the hash/array referenced by REF,
+in which case the ELEMENT takes the place of the associated key/subscript).
+The METHOD passed is to provide syntax error reorting
+(refer to the B<syntax> attribute).
+Returns a boolean, whereby a successful match is TRUE, and FALSE otherwise.
+
+=cut
+
+sub Matches {
+	my $self = shift;
+	my $meth = shift;
+	my $value = shift;
+	my $elem = shift;
+	my $ref = shift;
+
+	$self->log->logconfess(sprintf $self->syntax, $meth) unless (
+		defined($meth) && defined($value) &&
+		defined($elem) && ref($elem) eq '');
+
+	$self->log->debug("meth [$meth] value [$value] elem [$elem]");
+
+	my $msg = sprintf($self->error, $meth);
+	
+	if (defined($ref)) {
+
+		if (ref($ref) eq 'HASH') {
+
+			return 1 if (exists($ref->{$elem}) &&
+				$self->Compare($meth, 'eq', $ref->{$elem}, $value));
+
+		} elsif (ref($ref) eq 'ARRAY') {
+
+			return 1 if (exists($ref->[$elem]) &&
+				$self->Compare($meth, 'eq', $ref->[$elem], $value));
+
+		} else {
+			$self->cough($msg);
+		}
+	}
+	return 1 if ($self->Compare($meth, 'eq', $elem, $value));
+
+	return 0;
+}
+
 =item OBJ->global(BOOLEAN)
 
 Get or set a boolean value which controls whether the B<null> value will take a
@@ -169,7 +272,19 @@ sub global {
 	return $self->{'_global'};
 }
 
-=item OBJ->is_blank(EXPR)
+=item OBJ->is_notblank(EXPR, [REF])
+
+Check if the string passed in EXPR is a blank or whitespace string.
+
+=cut
+
+sub is_notblank {
+	my $self = shift;
+	my $str = shift;
+	confess "SYNTAX: is_notblank(EXPR, [REF])" unless defined ($str);
+}
+
+=item OBJ->is_blank(EXPR, [REF])
 
 Check if the string passed in EXPR is a blank or whitespace string.
 
@@ -177,8 +292,21 @@ Check if the string passed in EXPR is a blank or whitespace string.
 
 sub is_blank {
 	my $self = shift;
+	my $elem = shift;
+	my $ref = shift;
+	confess "SYNTAX: is_blank(EXPR, [REF])" unless (
+		defined($elem) && ref($elem) eq '');
+
+	if (defined($ref)) {
+		if (ref($ref) eq 'HASH') {
+		} elsif (ref($ref) eq 'ARRAY') {
+		} else {
+			$self->cough($self->error);
+		}
+	}
+
 	my $str = shift;
-	confess "SYNTAX: is_blank(EXPR)" unless defined ($str);
+	confess "SYNTAX: is_blank(EXPR, [REF])" unless defined ($str);
 
 #	return -1 unless defined($str);
 #Will return a negative value if EXPR is undefined.
@@ -188,7 +316,7 @@ sub is_blank {
 	return 0;
 }
 
-=item OBJ->is_notempty(EXPR, [HASHREF])
+=item OBJ->is_notempty(EXPR, [REF])
 
 The complementary method to B<is_empty> will report a BOOLEAN denoting if
 the EXPR element of the HASH has a valid (not-empty) value.
@@ -197,15 +325,14 @@ the EXPR element of the HASH has a valid (not-empty) value.
 
 sub is_notempty {
 	my $self = shift;
-	my $key = shift;
-	my $rh = shift;
+	my $elem = shift;
+	my $ref = shift;
+	confess "SYNTAX: is_notempty(EXPR, [REF])" unless (
+		defined($elem) && ref($elem) eq '');
 
-	confess "SYNTAX: is_notempty(EXPR, [HASHREF])" unless (
-		defined($key) && ref($key) eq '');
-
-	if (defined($rh)) {
-		if (ref($rh) eq 'HASH') {
-		} elsif (ref($rh) eq 'ARRAY') {
+	if (defined($ref)) {
+		if (ref($ref) eq 'HASH') {
+		} elsif (ref($ref) eq 'ARRAY') {
 		} else {
 			$self->cough($self->error);
 		}
@@ -213,20 +340,20 @@ sub is_notempty {
 
 	# MUST DEFINE NON-FATAL PROCESSING FROM PARENT CLASS? i.e. $self->cough(MESG)
 
-	return 0 unless defined($key);
+	return 0 unless defined($elem);
 
-	return 0 unless (exists $rh->{$key});
+	return 0 unless (exists $ref->{$elem});
 
 #	NOT REALLY HAPPY WITH THE NEXT EXPRESSION. should be in a separate function, e.g. is_empty
 
-	return 0 if ($self->is_blank( $rh->{$key} ));
+	return 0 if ($self->is_blank( $ref->{$elem} ));
 
-	return 0 if ($rh->{$key} eq $self->null);
+	return 0 if ($ref->{$elem} eq $self->null);
 
 	return 1;
 }
 
-=item OBJ->is_empty(EXPR, [HASHREF])
+=item OBJ->is_empty(EXPR, [REF])
 
 The complementary method to B<is_notempty> will report a BOOLEAN denoting if
 the EXPR element of the HASH has a null value (tolerant to a non-existent
@@ -238,7 +365,7 @@ sub is_empty {
 	my $self = shift;
 	my $key = shift;
 	my $rh = shift;
-	confess "SYNTAX: is_empty(EXPR, [HASHREF])" unless (
+	confess "SYNTAX: is_empty(EXPR, [REF])" unless (
 		defined($rh) && ref($rh) eq 'HASH'
 	);
 
@@ -317,7 +444,7 @@ sub null {
 	return $self->{'_null_l'};
 }
 
-=item OBJ->nvl(EXPR)
+=item OBJ->nvl(EXPR, [REF])
 
 Guarantee a non-null value for the EXPR passed, even if undefined.
 Whitespace (blanks) will be replaced with the B<null> attribute.
@@ -326,18 +453,34 @@ Whitespace (blanks) will be replaced with the B<null> attribute.
 
 sub nvl {
 	my $self = shift;
-	my $value = shift;
+	my $elem = shift;
+	my $ref = shift;
+	confess "SYNTAX: nvl(EXPR, [REF])" unless (
+		defined($elem) && ref($elem) eq '');
 
 	return $self->null
-		unless defined($value);
+		unless defined($elem);
 
 	return $self->null
-		if $self->is_blank($value);
+		if ($self->Matches("nvl", $self->null, $elem, $ref));
 
-	$self->log->trace("value [$value]");
+	return $self->null
+		if $self->is_blank($elem, $ref);
 
-	return $value;
+	return $elem;
 }
+
+=head2 ALIASED METHODS
+
+The following method aliases have also been defined:
+
+	alias		base method
+	------------	------------	
+	isnt_blank	is_notblank
+
+=cut
+
+*isnt_blank = \&is_notblank;
 
 #sub END { }
 

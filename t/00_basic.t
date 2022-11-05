@@ -7,7 +7,7 @@ use strict;
 use Data::Dumper;
 use Logfer qw/ :all /;
 #use Log::Log4perl qw/ :easy /;
-use Test::More tests => 73;
+use Test::More tests => 77;
 
 BEGIN { use_ok('Batch::Exec::Null') };
 
@@ -37,7 +37,7 @@ isa_ok($obn3, "Batch::Exec::Null",	"class check $cycle"); $cycle++;
 
 # -------- simple attributes --------
 my @attr = $obn1->Attributes;
-my $attrs = 14;
+my $attrs = 15;
 is(scalar(@attr), $attrs,		"class attributes");
 is(shift @attr, "Batch::Exec::Null",	"class okay");
 
