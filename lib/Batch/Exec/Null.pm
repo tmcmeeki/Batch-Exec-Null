@@ -41,6 +41,10 @@ The error message reported when an operator has insufficient arguments.
 
 Get ot set the REGEXP used to test a blank string.  A default applies.
 
+=item OBJ->match
+
+The matched value from the last comparison operation.
+
 =item OBJ->error
 
 The error message reported when method syntax is not complied with.
@@ -79,7 +83,7 @@ our $AUTOLOAD;
 #our @EXPORT = qw();
 #our @ISA = qw(Exporter);
 our @ISA;
-our $VERSION = '0.001';
+our $VERSION = sprintf "%d.%03d", q[_IDE_REVISION_] =~ /(\d+)/g;
 
 
 # --- package locals ---
@@ -87,12 +91,13 @@ my $_n_objects = 0;
 my $_s_null = S_NULL;
 
 my %_attribute = (	# _attributes are restricted; no direct get/set
-	_global => 0,		# boolean: class global null value
+	_global => 1,		# boolean: class global null value
 	_null_g => \$_s_null,
 	_null_l => S_NULL,
 	arguments => "method %s() operator [%s] requires %s arguments",
 	blank => qr/^\s*$/,
 	error => "method %s() must pass a hash or array reference",
+	match => undef,
 	novalue => "method %s() argument %s is undefined",
 	operator => "method %s() invalid operator [%s]; must be one of: { %s }",
 	syntax => "SYNTAX: %s(EXPR, [REF])",
@@ -199,7 +204,7 @@ sub Compare {
 
 	my $argw = $op{$op};
 	my $args = scalar(@_);
-	$self->log->debug(sprintf "argw [$argw] args [$args]");
+	$self->log->trace(sprintf "argw [$argw] args [$args]");
 
 	$msg = sprintf($self->arguments, $method, $op, $argw);
 
@@ -216,24 +221,27 @@ sub Compare {
 			return 0;
 		}
 	}
+	$self->log->trace(sprintf "values [%s]", Dumper(\@values));
 
 	# perform the comparison
 
-	if ($op eq 'eq') {
+	my $rv = 0; if ($op eq 'eq') {
 
-		return 1 if ($values[0] eq $values[1]);
+		$rv = 1 if ($values[0] eq $values[1]);
 
 	} elsif ($op eq 'like') {
 
-		return 1 if ($values[0] =~ $values[1]);
+		$rv = 1 if ($values[0] =~ $values[1]);
 
 	} elsif ($op eq 'noop') {
 
-		return 1;
+		$rv = 1;
 	} else {
 		$self->log->logconfess($msg);
 	}
-	return 0;
+	$self->log->debug("rv [$rv]");
+
+	return $rv;
 }
 
 =item OBJ->Matches(METHOD, VALUE, ELEMENT, [REF])
@@ -250,38 +258,47 @@ Returns a boolean, whereby a successful match is TRUE, and FALSE otherwise.
 sub Matches {
 	my $self = shift;
 	my $meth = shift;
-	my $value = shift;
-	my $elem = shift;
+	my $v2 = shift;
+	my $v1 = shift;
 	my $ref = shift;
 
 	$self->log->logconfess(sprintf $self->syntax, $meth) unless (
-		defined($meth) && defined($value) &&
-		defined($elem) && ref($elem) eq '');
+		defined($meth) && defined($v2) &&
+		defined($v1) && ref($v1) eq '');
 
-	$self->log->debug("meth [$meth] value [$value] elem [$elem]");
+	$self->match(undef);	# will use this to store the match
 
-	my $msg = sprintf($self->error, $meth);
+	$self->log->trace("v2 [$v2] v1 [$v1]");
 
-	my $op = (ref($value) eq 'Regexp') ? 'like' : 'eq';
+	my $op = (ref($v2) eq 'Regexp') ? 'like' : 'eq';
 
 	if (defined($ref)) {
 
 		if (ref($ref) eq 'HASH') {
 
-			return 1 if (exists($ref->{$elem}) &&
-				$self->Compare($meth, $op, $ref->{$elem}, $value));
+			if (exists($ref->{$v1})) {
 
+				my $w = $self->match($ref->{$v1});
+
+				return 1
+					if ($self->Compare($meth, $op, $w, $v2));
+			}
 		} elsif (ref($ref) eq 'ARRAY') {
 
-			return 1 if (exists($ref->[$elem]) &&
-				$self->Compare($meth, $op, $ref->[$elem], $value));
+			if (exists($ref->[$v1])) {
 
+				my $w = $self->match($ref->[$v1]);
+
+				return 1
+					if ($self->Compare($meth, $op, $w, $v2));
+			}
 		} else {
-			$self->cough($msg);
+			$self->cough(sprintf $self->error, $meth);
 		}
+	} else {
+		return 1
+			if ($self->Compare($meth, $op, $self->match($v1), $v2));
 	}
-	return 1 if ($self->Compare($meth, $op, $elem, $value));
-
 	return 0;
 }
 
@@ -290,7 +307,7 @@ sub Matches {
 Get or set a boolean value which controls whether the B<null> value will take a
 object-specific (local) or class-global value.
 The latter is useful for when this class is utilised in disparate classes.
-The default value is false, i.e. local.
+The default value is true, i.e. a global value is assumed.
 
 =cut
 
@@ -473,11 +490,11 @@ sub nvl {
 	my $self = shift;
 	my $elem = shift;
 	my $ref = shift;
-	confess "SYNTAX: nvl(EXPR, [REF])" unless (
-		defined($elem) && ref($elem) eq '');
 
-	return $self->null
+	return $self->null	# should produce a non-fatal result
 		unless defined($elem);
+
+	confess "SYNTAX: nvl(EXPR, [REF])" unless (ref($elem) eq '');
 
 	return $self->null
 		if ($self->Matches("nvl", $self->null, $elem, $ref));
@@ -485,7 +502,12 @@ sub nvl {
 	return $self->null
 		if $self->is_blank($elem, $ref);
 
-	return $elem;
+	return $self->null
+		unless defined($self->match);
+
+	$self->log->debug(sprintf "elem [$elem] match [%s]", $self->match);
+
+	return $self->match;
 }
 
 =back

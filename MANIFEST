@@ -1,3 +1,4 @@
+Batch-Exec-Null_audit.txt
 Changes
 IDE_VERSION
 LICENSE
@@ -7,4 +8,5 @@ README
 README.md
 lib/Batch/Exec/Null.pm
 t/00_basic.t
-t/01_primitive.t
+t/01_scalar.t
+t/02_struct.t

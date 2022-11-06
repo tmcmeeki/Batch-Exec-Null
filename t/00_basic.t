@@ -7,7 +7,7 @@ use strict;
 use Data::Dumper;
 use Logfer qw/ :all /;
 #use Log::Log4perl qw/ :easy /;
-use Test::More tests => 93;
+use Test::More tests => 101;
 
 BEGIN { use_ok('Batch::Exec::Null') };
 
@@ -28,16 +28,16 @@ my $cycle = 1;
 my $obn1 = Batch::Exec::Null->new;
 isa_ok($obn1, "Batch::Exec::Null",	"class check $cycle"); $cycle++;
 
-my $obn2 = Batch::Exec::Null->new(global => 1);
+my $obn2 = Batch::Exec::Null->new(global => 0);
 isa_ok($obn2, "Batch::Exec::Null",	"class check $cycle"); $cycle++;
 
-my $obn3 = Batch::Exec::Null->new(global => 1);
+my $obn3 = Batch::Exec::Null->new;
 isa_ok($obn3, "Batch::Exec::Null",	"class check $cycle"); $cycle++;
 
 
 # -------- simple attributes --------
 my @attr = $obn1->Attributes;
-my $attrs = 19;
+my $attrs = 21;
 is(scalar(@attr), $attrs,		"class attributes");
 is(shift @attr, "Batch::Exec::Null",	"class okay");
 
@@ -76,8 +76,8 @@ is($obn1->Inherit($obn2), $attrs - 1,	"inherit same attribute count");
 
 
 # -------- global --------
-is($obn1->global, 0, 		"global unset");
-is($obn2->global, 1, 		"global set $cycle"); $cycle++;
+is($obn1->global, 1, 		"global default");
+is($obn2->global, 0, 		"global set $cycle"); $cycle++;
 is($obn3->global, 1, 		"global set $cycle"); $cycle++;
 
 
@@ -97,11 +97,11 @@ my $rex = qr/xxx/;
 is($obn2->null("xxx"), "xxx",		"global null override");
 
 isnt($obn1->null, $obn2->null, 		"local differentiated from global");
-is($obn2->null, $obn3->null, 		"global null consistent");
+is($obn1->null, $obn3->null, 		"global null consistent");
 
 like($obn1->null, $ren, 		"null matches $cycle"); $cycle++;
 like($obn2->null, $rex, 		"null matches $cycle"); $cycle++;
-like($obn3->null, $rex, 		"null matches $cycle"); $cycle++;
+like($obn3->null, $ren, 		"null matches $cycle"); $cycle++;
 
 __END__
 
