@@ -7,7 +7,7 @@ use strict;
 use Data::Dumper;
 use Logfer qw/ :all /;
 #use Log::Log4perl qw/ :easy /;
-use Test::More tests => 61;
+use Test::More tests => 85;
 
 BEGIN { use_ok('Batch::Exec::Null') };
 
@@ -107,6 +107,38 @@ is($obn1->isnt_blank("aa", \%data), 1,		"isnt_blank hash no");
 is($obn1->isnt_blank("dd", \%data), 0,		"isnt_blank hash blank");
 is($obn1->isnt_blank(0, \@data), 1,		"isnt_blank array no");
 is($obn1->isnt_blank(3, \@data), 0,		"isnt_blank array blank");
+
+
+# -------- is_empty structures --------
+is($obn2->is_empty("aa", \%data), 0,		"is_empty hash no");
+is($obn1->is_empty("bb", \%data), 0,		"is_empty hash yes");
+is($obn2->is_empty("bb", \%data), 1,		"is_empty hash yes");
+is($obn2->is_empty("cc", \%data), 1,		"is_empty hash undef warn");
+is($obn2->is_empty("dd", \%data), 1,		"is_empty hash blank");
+is($obn2->is_empty("ee", \%data), 1,		"is_empty hash dne");
+
+is($obn2->is_empty(0, \@data), 0,		"is_empty array no");
+is($obn1->is_empty(1, \@data), 0,		"is_empty array yes");
+is($obn2->is_empty(1, \@data), 1,		"is_empty array yes");
+is($obn2->is_empty(2, \@data), 1,		"is_empty array undef warn");
+is($obn2->is_empty(3, \@data), 1,		"is_empty array blank");
+is($obn2->is_empty(4, \@data), 1,		"is_empty array dne");
+
+
+# -------- negation: is_notempty and isnt_empty --------
+is($obn2->is_notempty("aa", \%data), 1,		"is_notempty hash no");
+is($obn1->is_notempty("bb", \%data), 1,		"is_notempty hash yes");
+is($obn2->is_notempty("bb", \%data), 0,		"is_notempty hash yes");
+is($obn2->is_notempty("cc", \%data), 0,		"is_notempty hash undef warn");
+is($obn2->is_notempty("dd", \%data), 0,		"is_notempty hash blank");
+is($obn2->is_notempty("ee", \%data), 0,		"is_notempty hash dne");
+
+is($obn2->isnt_empty("aa", \%data), 1,		"isnt_empty hash no");
+is($obn1->isnt_empty("bb", \%data), 1,		"isnt_empty hash yes");
+is($obn2->isnt_empty("bb", \%data), 0,		"isnt_empty hash yes");
+is($obn2->isnt_empty("cc", \%data), 0,		"isnt_empty hash undef warn");
+is($obn2->isnt_empty("dd", \%data), 0,		"isnt_empty hash blank");
+is($obn2->isnt_empty("ee", \%data), 0,		"isnt_empty hash dne");
 
 
 # -------- nvl structures --------

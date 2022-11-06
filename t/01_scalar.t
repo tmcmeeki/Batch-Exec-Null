@@ -7,7 +7,7 @@ use strict;
 use Data::Dumper;
 use Logfer qw/ :all /;
 #use Log::Log4perl qw/ :easy /;
-use Test::More tests => 52;
+use Test::More tests => 71;
 
 BEGIN { use_ok('Batch::Exec::Null') };
 
@@ -77,7 +77,6 @@ SKIP: {
 	is($obn1->is_null(undef), 0,		"is_null undef");
 }
 
-
 # -------- negation: is_notnull and isnt_null --------
 is($obn1->is_notnull($obn1->null), 0,	"is_notnull definitive");
 is($obn1->is_notnull(""), 1,		"is_notnull blank");
@@ -98,7 +97,6 @@ SKIP: {
 	is($obn1->is_blank(undef), 0,		"is_blank syntax");
 }
 
-
 # -------- negation: is_notblank and isnt_blank --------
 is($obn1->is_notblank(""), 0,		"is_notblank empty");
 is($obn1->is_notblank(" "), 0,		"is_notblank space");
@@ -107,6 +105,35 @@ is($obn1->is_notblank("x"), 1,		"is_notblank notempty");
 is($obn1->isnt_blank(""), 0,		"isnt_blank empty");
 is($obn1->isnt_blank(" "), 0,		"isnt_blank space");
 is($obn1->isnt_blank("x"), 1,		"isnt_blank notempty");
+
+
+# -------- is_empty scalars --------
+is($obn1->is_empty($obn1->null), 1,	"is_empty definitive");
+is($obn1->is_empty(""), 1,		"is_empty blank");
+is($obn1->is_empty("xxx"), 1,		"is_empty override");
+is($obn1->is_empty(""), 1,		"is_empty empty");
+is($obn1->is_empty(" "), 1,		"is_empty space");
+is($obn1->is_empty("x"), 0,		"is_empty notempty");
+SKIP: {
+        skip "syntax errors is_empty", 1;
+
+	is($obn1->is_empty(undef), 0,		"is_empty syntax");
+}
+
+# -------- negation: is_notempty and isnt_empty --------
+is($obn1->is_notempty(""), 0,		"is_notempty empty");
+is($obn1->is_notempty(" "), 0,		"is_notempty space");
+is($obn1->is_notempty("x"), 1,		"is_notempty notempty");
+is($obn1->is_notempty($obn1->null), 0,	"is_notempty definitive");
+is($obn1->is_notempty(""), 0,		"is_notempty blank");
+is($obn1->is_notempty("abc"), 1,	"is_notempty string");
+
+is($obn1->isnt_empty(""), 0,		"isnt_empty empty");
+is($obn1->isnt_empty(" "), 0,		"isnt_empty space");
+is($obn1->isnt_empty("x"), 1,		"isnt_empty notempty");
+is($obn1->isnt_empty($obn1->null), 0,	"isnt_empty definitive");
+is($obn1->isnt_empty(""), 0,		"isnt_empty blank");
+is($obn1->isnt_empty("abc"), 1,		"isnt_empty string");
 
 
 # -------- nvl scalar --------

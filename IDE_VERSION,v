@@ -1,9 +1,14 @@
-head	1.2;
+head	1.3;
 access;
 symbols;
 locks; strict;
 comment	@# @;
 
+
+1.3
+date	2022.11.06.20.02.57;	author tomby;	state Exp;
+branches;
+next	1.2;
 
 1.2
 date	2022.11.06.19.19.24;	author tomby;	state Exp;
@@ -20,14 +25,25 @@ desc
 @@
 
 
-1.2
+1.3
 log
 @*** empty log message ***
 @
 text
 @IDE_PACKAGE: Batch-Exec-Null
-IDE_VERSION: $Revision: 1.1 $
+IDE_VERSION: $Revision: 1.2 $
 IDE_DATE: 20221106
+@
+
+
+1.2
+log
+@*** empty log message ***
+@
+text
+@d2 1
+a2 1
+IDE_VERSION: $Revision: 1.1 $
 @
 
 

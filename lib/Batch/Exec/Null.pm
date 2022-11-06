@@ -75,6 +75,8 @@ use Data::Dumper;
 
 
 # --- package constants ---
+use constant RE_BLANK => qr/^\s*$/;
+
 use constant S_NULL => "(null)";
 
 
@@ -95,7 +97,7 @@ my %_attribute = (	# _attributes are restricted; no direct get/set
 	_null_g => \$_s_null,
 	_null_l => S_NULL,
 	arguments => "method %s() operator [%s] requires %s arguments",
-	blank => qr/^\s*$/,
+	blank => RE_BLANK,
 	error => "method %s() must pass a hash or array reference",
 	match => undef,
 	novalue => "method %s() argument %s is undefined",
@@ -173,7 +175,7 @@ sub new {
 
 =over 4
 
-=item OBJ->Compare(OPERATOR, EXPR, [EXPR])
+=item OBJ->Compare(METHOD, OPERATOR, ...)
 
 INTERNAL ROUTINE ONLY.
 Execute the comparison stipulated by OPERATOR (one of: 'eq', 'like'), to
@@ -187,7 +189,7 @@ sub Compare {
 	my $method = shift;
 	my $op = shift;
 
-	confess "SYNTAX: Compare(OPERATOR, ...)" unless (
+	confess "SYNTAX: Compare(METHOD, OPERATOR, ...)" unless (
 		defined($method) && defined($op));
 
 	$self->log->debug("method [$method] op [$op]");
@@ -331,6 +333,9 @@ sub global {
 =item OBJ->is_blank(EXPR, [REF])
 
 Check if the string passed in EXPR is a blank or whitespace string.
+If REF is also supplied, which may be an array or hash, then EXPR is treated as
+a hash key or array subscript.
+Returns a boolean.
 
 =cut
 
@@ -344,7 +349,7 @@ sub is_blank {
 
 =item OBJ->is_notblank(EXPR, [REF])
 
-Check if the string passed in EXPR is a blank or whitespace string.
+The complementary method to B<is_blank>.
 
 =cut
 
@@ -356,75 +361,52 @@ sub is_notblank {
 	return 1;
 }
 
-=item OBJ->is_notempty(EXPR, [REF])
-
-The complementary method to B<is_empty> will report a BOOLEAN denoting if
-the EXPR element of the HASH has a valid (not-empty) value.
-
-=cut
-
-sub is_notempty {
-	my $self = shift;
-	my $elem = shift;
-	my $ref = shift;
-	confess "SYNTAX: is_notempty(EXPR, [REF])" unless (
-		defined($elem) && ref($elem) eq '');
-
-	if (defined($ref)) {
-		if (ref($ref) eq 'HASH') {
-		} elsif (ref($ref) eq 'ARRAY') {
-		} else {
-			$self->cough($self->error);
-		}
-	}
-
-	# MUST DEFINE NON-FATAL PROCESSING FROM PARENT CLASS? i.e. $self->cough(MESG)
-
-	return 0 unless defined($elem);
-
-	return 0 unless (exists $ref->{$elem});
-
-#	NOT REALLY HAPPY WITH THE NEXT EXPRESSION. should be in a separate function, e.g. is_empty
-
-	return 0 if ($self->is_blank( $ref->{$elem} ));
-
-	return 0 if ($ref->{$elem} eq $self->null);
-
-	return 1;
-}
-
 =item OBJ->is_empty(EXPR, [REF])
 
-The complementary method to B<is_notempty> will report a BOOLEAN denoting if
-the EXPR element of the HASH has a null value (tolerant to a non-existent
-element).
+Check if the string passed in EXPR is either null or blank (or non-existent).
+If REF is also supplied, which may be an array or hash, then EXPR is treated as
+a hash key or array subscript.
+Returns a boolean.
 
 =cut
 
 sub is_empty {
 	my $self = shift;
-	my $key = shift;
-	my $rh = shift;
-	confess "SYNTAX: is_empty(EXPR, [REF])" unless (
-		defined($rh) && ref($rh) eq 'HASH'
-	);
+	my $elem = shift;
+	my $ref = shift;
 
-	return 1 unless defined($key);
+	return 1
+		if $self->is_blank($elem, $ref);
 
-	if (exists $rh->{$key}) {
+	return 1
+		unless defined($self->match);
 
-		return 1 if ($self->is_blank( $rh->{$key} ));
+	return 1
+		if $self->is_null($elem, $ref);
 
-		return 1 if ($rh->{$key} eq $self->null);
+	return 0;
+}
 
-		return 0;
-	}
+=item OBJ->is_notempty(EXPR, [REF])
+
+The complementary method to B<is_empty>.
+
+=cut
+
+sub is_notempty {
+	my $self = shift;
+
+	return 0 if ($self->is_empty(@_));
+
 	return 1;
 }
 
 =item OBJ->is_null(EXPR, [REF])
 
-Will report a BOOLEAN denoting if the EXPR element of the HASH has a null value.
+Check if the string passed in EXPR is the defined null value.
+If REF is also supplied, which may be an array or hash, then EXPR is treated as
+a hash key or array subscript.
+Returns a boolean.
 
 =cut
 
@@ -519,11 +501,13 @@ The following method aliases have also been defined:
 	alias		base method
 	------------	------------	
 	isnt_blank	is_notblank
+	isnt_empty	is_notempty
 	isnt_null	is_notnull
 
 =cut
 
 *isnt_blank = \&is_notblank;
+*isnt_empty = \&is_notempty;
 *isnt_null = \&is_notnull;
 
 #sub END { }
