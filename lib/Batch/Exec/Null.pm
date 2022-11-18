@@ -192,7 +192,7 @@ sub Compare {
 	confess "SYNTAX: Compare(METHOD, OPERATOR, ...)" unless (
 		defined($method) && defined($op));
 
-	$self->log->debug("method [$method] op [$op]");
+	$self->log->trace("method [$method] op [$op]");
 
 	# check operator
 
@@ -241,7 +241,7 @@ sub Compare {
 	} else {
 		$self->log->logconfess($msg);
 	}
-	$self->log->debug("rv [$rv]");
+	$self->log->trace("rv [$rv]");
 
 	return $rv;
 }
