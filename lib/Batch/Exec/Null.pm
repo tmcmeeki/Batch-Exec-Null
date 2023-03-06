@@ -487,7 +487,7 @@ sub nvl {
 	return $self->null
 		unless defined($self->match);
 
-	$self->log->debug(sprintf "elem [$elem] match [%s]", $self->match);
+	$self->log->trace(sprintf "elem [$elem] match [%s]", $self->match);
 
 	return $self->match;
 }
